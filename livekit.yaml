@@ -1,0 +1,14 @@
+# livekit.yaml
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+
+logging:
+  json: false
+  level: info
+
+keys:
+  # These should match LIVEKIT_API_KEY and LIVEKIT_API_SECRET in your .env file
+  your_livekit_api_key: w0759QKTo84p4e4ID48f6CYItYMZCS5sszMxDZcIICn
