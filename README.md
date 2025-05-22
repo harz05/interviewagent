@@ -130,11 +130,16 @@ This project uses online LLM APIs (Mistral or OpenAI) for generating interview q
 
 2. Update the LiveKit configuration in `livekit.yaml` to match these credentials.
 
-## Next Steps
-
-- [ ] Implement speech-to-text for user input
-- [ ] Implement text-to-speech for AI responses
-- [ ] Add interview session recording and playback
-- [ ] Add feedback and analytics for interview performance
-- [ ] Implement user authentication and session management
-- [ ] Add interview templates for different job types
+#Livekit Server initialisation
+1. Install livekit server
+    ```bash
+    curl -sSL https://get.livekit.io | bash
+    ```
+2. Generate keys
+    ```bash
+    livekit-server generate-keys
+    ```
+3. Starting the server
+    ```bash
+    livekit-server --dev --keys "your_livekit_api_key: your_livekit_api_secret"
+    ```
