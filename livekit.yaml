@@ -11,4 +11,4 @@ logging:
 
 keys:
   # These should match LIVEKIT_API_KEY and LIVEKIT_API_SECRET in your .env file
-  your_livekit_api_key: w0759QKTo84p4e4ID48f6CYItYMZCS5sszMxDZcIICn
+  your_livekit_api_key: your_livekit_api_secret
