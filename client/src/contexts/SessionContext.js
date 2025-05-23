@@ -1,6 +1,5 @@
+// src/contexts/SessionContext.js
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { useRoom, useLocalParticipant } from '@livekit/components-react';
-import { Room } from 'livekit-client';
 import io from 'socket.io-client';
 
 const SessionContext = createContext();
@@ -11,9 +10,9 @@ export const SessionProvider = ({ children }) => {
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null);
-  const [room, setRoom] = useState(null);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [livekitUrl, setLivekitUrl] = useState(null);
+  const [livekitToken, setLivekitToken] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   // Initialize socket connection
   useEffect(() => {
@@ -38,19 +37,12 @@ export const SessionProvider = ({ children }) => {
     };
   }, []);
 
-  // Join the LiveKit room and session
+  // Join the session
   const joinSession = useCallback(async (sessionData) => {
     try {
       setSessionId(sessionData.sessionId);
-      
-      // Connect to LiveKit room
-      const newRoom = new Room();
-      await newRoom.connect(sessionData.livekitUrl, sessionData.token);
-      setRoom(newRoom);
-      
-      // Enable audio and video by default
-      await newRoom.localParticipant.setCameraEnabled(true);
-      await newRoom.localParticipant.setMicrophoneEnabled(true);
+      setLivekitUrl(sessionData.livekitUrl);
+      setLivekitToken(sessionData.token);
       
       // Join the socket.io room
       if (socket) {
@@ -58,7 +50,10 @@ export const SessionProvider = ({ children }) => {
       }
       
       // Add initial AI greeting
-      setMessages([{ sender: 'ai', text: "Hello! I'm your AI interviewer today. I'll ask you some questions about your experience and skills. Let's get started. Could you please introduce yourself?" }]);
+      setMessages([{ 
+        sender: 'ai', 
+        text: "Hello! I'm your AI interviewer today. I'll ask you some questions about your experience and skills. Let's get started. Could you please introduce yourself?" 
+      }]);
       
       return true;
     } catch (error) {
@@ -67,38 +62,19 @@ export const SessionProvider = ({ children }) => {
     }
   }, [socket]);
 
-  // Toggle audio
-  const toggleAudio = useCallback(async () => {
-    if (room) {
-      const enabled = !isAudioEnabled;
-      await room.localParticipant.setMicrophoneEnabled(enabled);
-      setIsAudioEnabled(enabled);
-    }
-  }, [room, isAudioEnabled]);
-
-  // Toggle video
-  const toggleVideo = useCallback(async () => {
-    if (room) {
-      const enabled = !isVideoEnabled;
-      await room.localParticipant.setCameraEnabled(enabled);
-      setIsVideoEnabled(enabled);
-    }
-  }, [room, isVideoEnabled]);
-
   // End session
   const endSession = useCallback(async () => {
     if (socket && sessionId) {
       socket.emit('end-session', { sessionId });
     }
     
-    if (room) {
-      room.disconnect();
-    }
-    
     setSessionId(null);
     setMessages([]);
+    setLivekitUrl(null);
+    setLivekitToken(null);
+    setIsConnected(false);
     return true;
-  }, [socket, sessionId, room]);
+  }, [socket, sessionId]);
 
   // Add user message to transcript and send to backend
   const sendMessage = useCallback((text) => {
@@ -108,18 +84,29 @@ export const SessionProvider = ({ children }) => {
     }
   }, [socket, sessionId]);
 
+  const onConnected = useCallback(() => {
+    setIsConnected(true);
+    console.log('Connected to LiveKit room');
+  }, []);
+
+  const onDisconnected = useCallback(() => {
+    setIsConnected(false);
+    console.log('Disconnected from LiveKit room');
+  }, []);
+
   return (
     <SessionContext.Provider
       value={{
         sessionId,
         messages,
-        isAudioEnabled,
-        isVideoEnabled,
+        livekitUrl,
+        livekitToken,
+        isConnected,
         joinSession,
-        toggleAudio,
-        toggleVideo,
         endSession,
-        sendMessage
+        sendMessage,
+        onConnected,
+        onDisconnected
       }}
     >
       {children}

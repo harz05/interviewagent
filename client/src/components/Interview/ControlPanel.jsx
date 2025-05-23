@@ -1,3 +1,4 @@
+// src/components/Interview/ControlPanel.jsx
 import React from 'react';
 import { Box, Paper, IconButton, Button, Typography } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
@@ -5,22 +6,33 @@ import MicOffIcon from '@mui/icons-material/MicOff';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import VideocamOffIcon from '@mui/icons-material/VideocamOff';
 import { useNavigate } from 'react-router-dom';
+import { useLocalParticipant } from '@livekit/components-react';
 import { useSession } from '../../contexts/SessionContext';
 
 const ControlPanel = () => {
   const navigate = useNavigate();
-  const { 
-    isAudioEnabled, 
-    isVideoEnabled, 
-    toggleAudio, 
-    toggleVideo, 
-    endSession 
-  } = useSession();
+  const { endSession } = useSession();
+  const { localParticipant } = useLocalParticipant();
 
   const handleEndInterview = async () => {
     await endSession();
     navigate('/');
   };
+
+  const toggleAudio = async () => {
+    if (localParticipant) {
+      await localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+    }
+  };
+
+  const toggleVideo = async () => {
+    if (localParticipant) {
+      await localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled);
+    }
+  };
+
+  const isAudioEnabled = localParticipant?.isMicrophoneEnabled ?? false;
+  const isVideoEnabled = localParticipant?.isCameraEnabled ?? false;
 
   return (
     <Paper sx={{ p: 2, mt: 2 }}>
