@@ -2,19 +2,20 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
 import {
-  useLocalParticipant,
+  useTracks,
   useRemoteParticipants,
   VideoTrack,
   useConnectionState,
   ConnectionState
 } from '@livekit/components-react';
+import { Track } from 'livekit-client';
 
 const VideoPanel = () => {
   const connectionState = useConnectionState();
-  const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
+  const localTracks = useTracks([Track.Source.Camera]);
+  const localVideoTrack = localTracks.find(t => t.publication.source === Track.Source.Camera);
 
-  // Check if the connection is still establishing
   if (connectionState === ConnectionState.Connecting) {
     return (
       <Paper sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -23,7 +24,6 @@ const VideoPanel = () => {
     );
   }
 
-  // Check if the connection failed
   if (connectionState === ConnectionState.Disconnected || connectionState === ConnectionState.Failed) {
     return (
       <Paper sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -34,7 +34,6 @@ const VideoPanel = () => {
     );
   }
 
-  // Get the first remote participant (AI interviewer)
   const aiParticipant = remoteParticipants[0];
 
   return (
@@ -43,16 +42,16 @@ const VideoPanel = () => {
         <Typography variant="h6" sx={{ mb: 1 }}>AI Interviewer</Typography>
         <Box sx={{ flexGrow: 1, bgcolor: 'grey.800', borderRadius: 1, overflow: 'hidden' }}>
           {aiParticipant && aiParticipant.videoTracks.size > 0 ? (
-            <VideoTrack 
+            <VideoTrack
               participant={aiParticipant}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <Box 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
+            <Box
+              sx={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white'
               }}
@@ -62,22 +61,22 @@ const VideoPanel = () => {
           )}
         </Box>
       </Box>
-      
+
       <Box sx={{ height: '30%' }}>
         <Typography variant="h6" sx={{ mb: 1 }}>You</Typography>
         <Box sx={{ height: '100%', bgcolor: 'grey.200', borderRadius: 1, overflow: 'hidden' }}>
-          {localParticipant && localParticipant.isCameraEnabled && localParticipant.videoTrack ? (
-            <VideoTrack 
-              participant={localParticipant}
+          {localVideoTrack ? (
+            <VideoTrack
+              trackRef={localVideoTrack}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <Box 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
+            <Box
+              sx={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
               <Typography>Camera is off</Typography>
