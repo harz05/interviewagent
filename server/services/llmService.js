@@ -1,71 +1,137 @@
-const { getSessionMessages } = require('./sessionStore');
+// server/services/llmService.js - Enhanced for Mistral
+const fetch = require('node-fetch');
 const config = require('../config');
 const logger = require('../utils/logger');
 
-// Initialize the LLM provider based on configuration
-let llmProvider;
-
-if (config.llm.type === 'mistral') {
-  // Import Mistral API provider
-  llmProvider = require('./llmProviders/mistralAPI');
-} else if (config.llm.type === 'openai') {
-  // Import OpenAI API provider
-  llmProvider = require('./llmProviders/openaiAPI');
-} else {
-  // Default to Mistral if not specified
-  logger.warn(`Unknown LLM type: ${config.llm.type}, defaulting to Mistral API`);
-  llmProvider = require('./llmProviders/mistralAPI');
-}
-
 /**
- * Initialize the LLM service
+ * Generate AI response using Mistral API with conversation context
  */
-exports.initLLMService = async () => {
+exports.generateAIResponse = async (sessionId, userMessage, conversationHistory = []) => {
   try {
-    await llmProvider.initialize(config.llm);
-    logger.info(`LLM service initialized with provider: ${config.llm.type}`);
+    // Build conversation context
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an AI interviewer conducting a professional job interview. 
+        Be conversational, engaging, and ask follow-up questions based on the candidate's responses. 
+        Keep responses concise (2-3 sentences max) to maintain natural conversation flow.
+        Ask about their experience, skills, projects, and motivations.
+        Be encouraging and professional.`
+      },
+      ...conversationHistory.slice(-10), // Keep last 10 messages for context
+      {
+        role: 'user',
+        content: userMessage
+      }
+    ];
+
+    const requestBody = {
+      model: config.llm.model || 'mistral-7b-instruct',
+      messages: messages,
+      max_tokens: 150,
+      temperature: 0.7,
+      stream: false
+    };
+
+    const response = await fetch(`${config.llm.baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.llm.apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Mistral API error (${response.status}): ${errorText}`);
+    }
+
+    const result = await response.json();
+    const aiResponse = result.choices?.[0]?.message?.content?.trim();
+
+    if (!aiResponse) {
+      throw new Error('No response from Mistral API');
+    }
+
+    logger.info(`Mistral response generated for session ${sessionId}`);
+    return aiResponse;
+
   } catch (error) {
-    logger.error('Failed to initialize LLM service:', error);
-    throw error;
+    logger.error('Error generating AI response:', error);
+    // Fallback response
+    return "I apologize, I'm having some technical difficulties. Could you please repeat that?";
   }
 };
 
 /**
- * Generate AI response based on conversation history
- * @param {string} sessionId - The session ID
- * @param {string} userMessage - The latest user message
- * @returns {Promise<string>} - AI generated response
+ * Generate streaming AI response (for real-time responses)
  */
-exports.generateAIResponse = async (sessionId, userMessage) => {
+exports.generateStreamingAIResponse = async (sessionId, userMessage, conversationHistory, onChunk) => {
   try {
-    // Get conversation history
-    const messages = getSessionMessages(sessionId);
-    
-    // Format messages for the LLM
-    const formattedMessages = messages.map(msg => ({
-      role: msg.sender === 'ai' ? 'assistant' : 'user',
-      content: msg.text
-    }));
-    
-    // Add system prompt for interview context
-    const systemPrompt = `You are an AI interviewer conducting a job interview. 
-    Ask relevant questions about the candidate's experience, skills, and qualifications. 
-    Be professional but conversational. Ask one question at a time and wait for the response. 
-    Follow up on the candidate's answers when appropriate. At the end of the interview, thank the candidate for their time.`;
-    
-    // Add latest user message if not already in history
-    if (!messages.find(msg => msg.sender === 'user' && msg.text === userMessage)) {
-      formattedMessages.push({
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an AI interviewer. Be conversational and concise.`
+      },
+      ...conversationHistory.slice(-8),
+      {
         role: 'user',
         content: userMessage
-      });
+      }
+    ];
+
+    const response = await fetch(`${config.llm.baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.llm.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.llm.model,
+        messages: messages,
+        max_tokens: 150,
+        temperature: 0.7,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mistral API error: ${response.status}`);
     }
+
+    let fullResponse = '';
+    const reader = response.body.getReader();
     
-    // Generate response
-    const aiResponse = await llmProvider.generateResponse(systemPrompt, formattedMessages);
-    return aiResponse;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = new TextDecoder().decode(value);
+      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') break;
+          
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              onChunk(content);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+      }
+    }
+
+    return fullResponse;
   } catch (error) {
-    logger.error('Error generating AI response:', error);
+    logger.error('Error generating streaming AI response:', error);
     throw error;
   }
 };

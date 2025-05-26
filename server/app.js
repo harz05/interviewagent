@@ -4,7 +4,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const config = require('./config');
-const routes = require('./routes');
+const mainRoutes = require('./routes'); // Renamed to avoid conflict
+const webhookRoutes = require('./routes/webhookRoutes');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -29,11 +30,15 @@ app.use(cors({
 // Logging
 app.use(morgan('dev'));
 
-// Parse JSON bodies
+// IMPORTANT: Webhook routes that need raw body should be registered BEFORE express.json()
+// The raw body parsing is handled within webhookRoutes.js itself.
+app.use('/api/webhooks', webhookRoutes);
+
+// Parse JSON bodies for other routes
 app.use(express.json());
 
-// API routes
-app.use('/api', routes);
+// API routes (main)
+app.use('/api', mainRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
