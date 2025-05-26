@@ -1,5 +1,6 @@
 # AI Interview Agent
 
+This is a developing projects and currently exploring different approaches for the implementation of it. Checkout branches for other approaches.
 An AI-powered interview agent that conducts realistic mock interviews using online LLM APIs and real-time video communication.
 
 ## Features
@@ -9,6 +10,7 @@ An AI-powered interview agent that conducts realistic mock interviews using onli
 - Text-to-speech for AI responses
 - Speech-to-text for user input
 - Responsive UI built with React and Material UI
+
 
 ## Project Structure
 
