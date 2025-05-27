@@ -14,6 +14,13 @@ const {
 const receiver = new WebhookReceiver(config.livekit.apiKey, config.livekit.apiSecret);
 
 exports.handleLivekitWebhook = async (req, res) => {
+  // Add a very prominent log to see if any webhook hits this endpoint
+  logger.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+  logger.error('!!! WEBHOOK RECEIVED AT /api/webhooks/livekit !!!');
+  logger.error('Headers:', JSON.stringify(req.headers, null, 2));
+  logger.error('Raw Body (first 500 chars):', req.rawBody ? req.rawBody.substring(0, 500) : 'No Raw Body');
+  logger.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+
   try {
     // The Egress service posts a JSON body.
     // For other webhooks, LiveKit posts an Authorization header and an empty body.

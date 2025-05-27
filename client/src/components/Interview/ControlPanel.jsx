@@ -10,9 +10,38 @@ import { useLocalParticipant } from '@livekit/components-react';
 import { useSession } from '../../contexts/SessionContext';
 
 const ControlPanel = () => {
+  console.log('--- ControlPanel RENDERED ---', new Date().toISOString());
+  
   const navigate = useNavigate();
-  const { endSession } = useSession();
+  const {
+    endSession,
+    isTranscribing,
+    userTranscript,
+    startTranscription,
+    stopTranscription
+  } = useSession();
   const { localParticipant } = useLocalParticipant();
+  
+  // Log transcription status and user transcript
+  React.useEffect(() => {
+    console.log('ControlPanel: isTranscribing =', isTranscribing);
+    if (userTranscript) {
+      console.log('ControlPanel: userTranscript =',
+                  userTranscript.substring(0, 50) +
+                  (userTranscript.length > 50 ? '...' : ''));
+    }
+  }, [isTranscribing, userTranscript]);
+  
+  // Log local participant status
+  React.useEffect(() => {
+    if (localParticipant) {
+      console.log('ControlPanel: localParticipant status -',
+                  'mic:', localParticipant.isMicrophoneEnabled ? 'ON' : 'OFF',
+                  'camera:', localParticipant.isCameraEnabled ? 'ON' : 'OFF');
+    } else {
+      console.log('ControlPanel: localParticipant not available');
+    }
+  }, [localParticipant?.isMicrophoneEnabled, localParticipant?.isCameraEnabled]);
 
   const handleEndInterview = async () => {
     await endSession();
@@ -21,7 +50,25 @@ const ControlPanel = () => {
 
   const toggleAudio = async () => {
     if (localParticipant) {
-      await localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+      const newMicState = !localParticipant.isMicrophoneEnabled;
+      await localParticipant.setMicrophoneEnabled(newMicState);
+      // If using LiveKit's mic state to control Deepgram, adjust here:
+      // if (newMicState && !isTranscribing) {
+      //   startTranscription();
+      // } else if (!newMicState && isTranscribing) {
+      //   stopTranscription();
+      // }
+      // For now, transcription is started/stopped by InterviewPage based on LiveKit connection.
+      // This toggle only mutes/unmutes the track sent to LiveKit. Deepgram continues if active.
+    }
+  };
+  
+  // Manual start/stop for transcription if needed, otherwise it's automatic from InterviewPage
+  const handleToggleTranscription = () => {
+    if (isTranscribing) {
+      stopTranscription();
+    } else {
+      startTranscription();
     }
   };
 
@@ -65,6 +112,23 @@ const ControlPanel = () => {
             End Interview
           </Button>
         </Box>
+      </Box>
+
+      {/* Transcription Status Display */}
+      <Box sx={{ mt: 1, textAlign: 'center' }}>
+        <Typography variant="caption" color={isTranscribing ? "green" : "textSecondary"}>
+          {isTranscribing ? "Listening..." : "Microphone off / Not transcribing"}
+        </Typography>
+        {isTranscribing && userTranscript && (
+          <Typography variant="caption" sx={{ display: 'block', fontStyle: 'italic', color: 'text.secondary', maxHeight: '3em', overflow: 'hidden' }}>
+            Interim: {userTranscript}
+          </Typography>
+        )}
+        
+        {/* Uncomment this button for manual control of transcription during testing */}
+        <Button onClick={handleToggleTranscription} size="small" sx={{ml: 2, mt: 1}}>
+          {isTranscribing ? "Stop Listening" : "Start Listening"}
+        </Button>
       </Box>
     </Paper>
   );

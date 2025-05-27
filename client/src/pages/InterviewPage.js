@@ -10,16 +10,29 @@ import { useSession } from '../contexts/SessionContext';
 import { getInterviewSession } from '../services/interviewService';
 
 const InterviewPage = () => {
+  console.log('--- InterviewPage RENDERED / REMOUNTED ---', new Date().toISOString());
+  
   const { sessionId } = useParams();
-  const { 
-    joinSession, 
-    livekitUrl, 
-    livekitToken, 
-    onConnected, 
-    onDisconnected 
+  const {
+    joinSession,
+    livekitUrl,
+    livekitToken,
+    onConnected, // This is now onLiveKitConnected in context
+    onDisconnected, // This is now onLiveKitDisconnected in context
+    isLiveKitConnected, // New state from context
+    startTranscription,
+    stopTranscription,
+    // isTranscribing, // Can be used for UI feedback
+    // userTranscript, // Can be used for UI feedback
   } = useSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Store stopTranscription in a ref to stabilize it for effect cleanup
+  const stopTranscriptionRef = React.useRef(stopTranscription);
+  React.useEffect(() => {
+    stopTranscriptionRef.current = stopTranscription;
+  }, [stopTranscription]);
 
   useEffect(() => {
     const setupSession = async () => {
@@ -35,7 +48,33 @@ const InterviewPage = () => {
     };
 
     setupSession();
-  }, [sessionId, joinSession]);
+
+    // Cleanup transcription on component unmount
+    return () => {
+      console.log('InterviewPage unmounting, stopping transcription.');
+      // Use the ref version to avoid dependency on stopTranscription
+      stopTranscriptionRef.current();
+    };
+  }, [sessionId, joinSession]); // Removed stopTranscription from dependency array
+
+  // Effect to start transcription when LiveKit is connected
+  // Use a ref to track if we've already started transcription for this connection
+  const hasStartedTranscriptionRef = React.useRef(false);
+  
+  useEffect(() => {
+    if (isLiveKitConnected && !hasStartedTranscriptionRef.current) {
+      console.log('LiveKit connected, attempting to start transcription.');
+      startTranscription();
+      hasStartedTranscriptionRef.current = true;
+    } else if (!isLiveKitConnected) {
+      // Reset the flag when disconnected
+      hasStartedTranscriptionRef.current = false;
+      console.log('LiveKit not connected/disconnected, transcription will be stopped by context.');
+    } else {
+      console.log('LiveKit connected but transcription already started.');
+    }
+  }, [isLiveKitConnected, startTranscription]);
+
 
   if (loading) {
     return (
@@ -73,6 +112,9 @@ const InterviewPage = () => {
       audio={true}
       token={livekitToken}
       serverUrl={livekitUrl}
+      // onConnected and onDisconnected from useSession are already wired up internally in SessionContext
+      // to call the LiveKitRoom's respective event handlers and then call our onLiveKitConnected/Disconnected
+      // So, we pass the context's onConnected/onDisconnected here which are actually named onLiveKitConnected/Disconnected in the context
       onConnected={onConnected}
       onDisconnected={onDisconnected}
       connect={true}
@@ -80,17 +122,18 @@ const InterviewPage = () => {
     >
       <Container maxWidth="xl" sx={{ height: '100vh', py: 2 }}>
         <Grid container spacing={2} sx={{ height: '100%' }}>
-          <Grid item xs={12} md={8} sx={{ height: { xs: '50%', md: '100%' } }}>
-            <VideoPanel />
-          </Grid>
-          <Grid item xs={12} md={4} sx={{ height: { xs: '50%', md: '100%' } }}>
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                <ChatPanel />
-              </Box>
-              <ControlPanel />
-            </Box>
-          </Grid>
+          <Grid item xs={12} md={9} sx={{ height: { xs: '50%', md: '100%' } }}>
+  <VideoPanel />
+</Grid>
+<Grid item xs={12} md={3} sx={{ height: { xs: '50%', md: '100%' } }}>
+  <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+      <ChatPanel />
+    </Box>
+    <ControlPanel />
+  </Box>
+</Grid>
+
         </Grid>
       </Container>
     </LiveKitRoom>

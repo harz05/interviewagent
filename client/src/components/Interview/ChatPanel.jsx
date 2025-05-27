@@ -3,11 +3,20 @@ import { Box, Paper, Typography, List, ListItem, ListItemText, Divider } from '@
 import { useSession } from '../../contexts/SessionContext';
 
 const ChatPanel = () => {
+  console.log('--- ChatPanel RENDERED ---', new Date().toISOString());
+  
   const { messages } = useSession();
   const messagesEndRef = useRef(null);
   
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
+    console.log('ChatPanel: messages updated, count =', messages.length);
+    if (messages.length > 0) {
+      console.log('ChatPanel: last message =',
+                  'sender:', messages[messages.length-1].sender,
+                  'text:', messages[messages.length-1].text.substring(0, 50) +
+                         (messages[messages.length-1].text.length > 50 ? '...' : ''));
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
