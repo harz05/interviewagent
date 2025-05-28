@@ -33,7 +33,15 @@ exports.generateAIResponse = async (sessionId, userMessage, conversationHistory 
       stream: false
     };
 
-    const response = await fetch(`${config.llm.baseUrl}/v1/chat/completions`, {
+    // Use the correct API endpoint URL
+    // If baseUrl is provided, use it, otherwise use the default Mistral API URL
+    const apiUrl = config.llm.baseUrl
+      ? `${config.llm.baseUrl}/chat/completions`
+      : 'https://api.mistral.ai/v1/chat/completions';
+    
+    logger.info(`[LLMService] Using Mistral API URL: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +89,7 @@ exports.generateStreamingAIResponse = async (sessionId, userMessage, conversatio
       }
     ];
 
-    const response = await fetch(`${config.llm.baseUrl}/v1/chat/completions`, {
+    const response = await fetch(`${config.llm.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

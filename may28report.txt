@@ -1,0 +1,20 @@
+OVERVIEW=>
+STT TRANSCRIPTION= it is working fine with text rendering in the chat
+LLM RESPONSE= responding to my speech and text is being generated but it is only showing on the log, issues in rendering in the chat
+TTS OF LLM= speech being generated is from the llm response and being saved locally
+
+MAJOR ISSUES=>
+#No speech rendering in real-time
+#AI response is not being rendered on the chat, only being shown in the log
+#The getIoInstance function in livekitAudioService.js still has some issues which causes the failure in ai message rendering
+#Check latest error log#
+
+
+IMPORTANT CHANGES THAT NEED CAUTION FOR UPCOMING CHANGES AND PUSHES=>
+#in livekitAudioService.js at Line 261 getIoInstance() was changed to getIoInstance which partially fixes the not function error, this is a key change which affected the error so must be kept in mind
+
+ISSUES TACKLED AS OF NOW=>
+#stt rendering
+#llm response
+#livekit functionality
+#tts is functioning

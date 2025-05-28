@@ -18,7 +18,7 @@ exports.initialize = async (config) => {
     
     apiConfig = {
       apiKey: config.apiKey,
-      model: config.model || 'mistral-7b-instruct-v0.2',
+      model: config.model || 'mistral-small-latest',
       baseUrl: config.baseUrl || 'https://api.mistral.ai/v1'
     };
     

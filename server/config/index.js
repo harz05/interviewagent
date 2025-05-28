@@ -11,7 +11,7 @@ module.exports = {
   llm: {
     type: process.env.LLM_TYPE || 'mistral', // 'mistral' or 'openai'
     apiKey: process.env.LLM_API_KEY,
-    model: process.env.LLM_MODEL || 'mistral-7b-instruct-v0.2',
+    model: process.env.LLM_MODEL || 'mistral-small-latest',
     baseUrl: process.env.LLM_API_BASE_URL
   },
   stt: {

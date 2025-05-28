@@ -12,8 +12,12 @@ const fsSync = require('fs'); // For createWriteStream
 const path = require('path');
 const { pipeline } = require('stream/promises');
 const { addMessageToSession } = require('./sessionStore');
+// Import the getIoInstance function directly
 const { getIoInstance } = require('../server');
 const { spawn } = require('child_process'); // For FFMPEG
+
+// Export the handleTranscript function so it can be used by socketService.js
+module.exports.handleTranscript = handleTranscript;
 
 const conversationHistories = new Map(); // roomName -> [{ role, content }]
 const activeEgresses = new Map(); // trackSid -> egressId (or roomName_participantIdentity -> egressId)
@@ -227,7 +231,7 @@ async function handleTranscript(roomName, userIdentity, transcript, isInitialAIM
       }]);
     }
     const currentConversation = conversationHistories.get(roomName);
-    currentConversation.push({ role: 'user', content: transcript, timestamp: new Date() });
+    currentConversation.push({ role: 'user', content: transcript });
   }
 
   try {
@@ -244,7 +248,7 @@ async function handleTranscript(roomName, userIdentity, transcript, isInitialAIM
     if (aiTextResponse) {
       if (!isInitialAIMessage) {
         const currentConversation = conversationHistories.get(roomName);
-        if(currentConversation) currentConversation.push({ role: 'assistant', content: aiTextResponse, timestamp: new Date() });
+        if(currentConversation) currentConversation.push({ role: 'assistant', content: aiTextResponse});
       }
       
       addMessageToSession(roomName, {
@@ -253,7 +257,8 @@ async function handleTranscript(roomName, userIdentity, transcript, isInitialAIM
         timestamp: new Date()
       });
 
-      const io = getIoInstance();
+      // Use the imported getIoInstance function directly
+      const io = getIoInstance;
       if (io) {
         io.to(roomName).emit('ai-message', aiTextResponse);
         logger.info(`[LiveKitAudioService] Emitted 'ai-message' via Socket.IO to room ${roomName}`);

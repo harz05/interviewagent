@@ -95,27 +95,65 @@ export const SessionProvider = ({ children }) => {
 
     try {
       const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Log the Deepgram API key (first few characters) for debugging
+      console.log('Deepgram API Key available:',
+                  process.env.REACT_APP_DEEPGRAM_API_KEY ?
+                  `${process.env.REACT_APP_DEEPGRAM_API_KEY.substring(0, 5)}...` :
+                  'Not found');
+      
+      // Simplify Deepgram parameters to reduce potential issues
       const newDgConnection = deepgramClient.listen.live({
         model: 'nova-2',
         smart_format: true,
         interim_results: true,
         language: 'en-US',
-        puncutate: true,
-        // diarize: true, // If you want to distinguish speakers (might be useful)
+        punctuate: true,
+        // Removed endpointing and vad_turnoff as they might be causing issues
       });
 
       newDgConnection.on(LiveTranscriptionEvents.Open, () => {
-        console.log('Deepgram connection opened.');
+        console.log('Deepgram connection opened successfully.');
         setIsTranscribing(true);
         if (mic.getAudioTracks().length > 0) {
-          const mediaRecorder = new MediaRecorder(mic, { mimeType: 'audio/webm' }); // Or other supported mimeType
-          mediaRecorder.addEventListener('dataavailable', event => {
-            if (event.data.size > 0 && newDgConnection.getReadyState() === 1 /* OPEN */) {
-              newDgConnection.send(event.data);
+          try {
+            // Try with explicit mime type
+            const mediaRecorder = new MediaRecorder(mic, { mimeType: 'audio/webm' });
+            
+            mediaRecorder.addEventListener('dataavailable', event => {
+              try {
+                if (event.data.size > 0 && newDgConnection.getReadyState() === 1 /* OPEN */) {
+                  console.log(`Sending audio chunk to Deepgram, size: ${event.data.size} bytes`);
+                  newDgConnection.send(event.data);
+                }
+              } catch (err) {
+                console.error('Error sending data to Deepgram:', err);
+              }
+            });
+            
+            // Send smaller chunks more frequently for better responsiveness
+            mediaRecorder.start(100); // Send data every 100ms
+            setMicrophone({ mediaRecorder, stream: mic });
+            console.log('MediaRecorder started successfully');
+          } catch (err) {
+            console.error('Error creating MediaRecorder:', err);
+            // Try with a fallback mime type if the first one fails
+            try {
+              const mediaRecorder = new MediaRecorder(mic);
+              mediaRecorder.addEventListener('dataavailable', event => {
+                if (event.data.size > 0 && newDgConnection.getReadyState() === 1) {
+                  newDgConnection.send(event.data);
+                }
+              });
+              mediaRecorder.start(100);
+              setMicrophone({ mediaRecorder, stream: mic });
+              console.log('MediaRecorder started with default mime type');
+            } catch (fallbackErr) {
+              console.error('Fallback MediaRecorder also failed:', fallbackErr);
             }
-          });
-          mediaRecorder.start(250); // Send data every 250ms
-          setMicrophone({ mediaRecorder, stream: mic });
+          }
+        } else {
+          console.error('No audio tracks available in the microphone stream');
         }
       });
 
@@ -124,6 +162,9 @@ export const SessionProvider = ({ children }) => {
         const transcript = currentAlternative.transcript;
 
         if (transcript) {
+          // Always update the interim transcript display for user feedback
+          setUserTranscript(transcript);
+          
           if (data.is_final && data.speech_final && transcript.trim()) {
             // This is a final transcript for an utterance
             const finalTranscript = transcript.trim();
@@ -140,22 +181,29 @@ export const SessionProvider = ({ children }) => {
             // Clear the interim transcript display
             setUserTranscript('');
             clearTimeout(transcriptTimeoutRef.current); // Clear any pending timeout
-
           } else {
             // This is an interim transcript
-            // Deepgram's interim results often provide the full transcript up to that point for the current utterance.
-            // So, we can usually just set it directly, not accumulate.
-            setUserTranscript(transcript);
-
-            // Optional: If you want to send data based on pauses even with interim results
+            // Set up a timeout to handle long pauses - if the user pauses for more than 2.5 seconds,
+            // we'll treat the current transcript as final even if Deepgram hasn't marked it as speech_final
             clearTimeout(transcriptTimeoutRef.current);
             transcriptTimeoutRef.current = setTimeout(() => {
-              // This logic could be used to send the current `userTranscript` if there's a significant pause,
-              // even if `is_final` or `speech_final` hasn't been received.
-              // However, this can lead to fragmented messages.
-              // It's generally better to rely on `is_final` and `speech_final`.
-              // console.log('Interim transcript timeout, current:', userTranscript);
-            }, 1500); // Adjust timeout as needed (e.g., 1.5 seconds of silence)
+              const currentTranscript = transcript.trim();
+              // Reduced minimum length requirement to capture shorter phrases
+              if (currentTranscript && currentTranscript.length > 2) {
+                console.log('Sending transcript after pause:', currentTranscript);
+                
+                // Add to messages list for local display
+                setMessages(prev => [...prev, { sender: 'user', text: currentTranscript }]);
+                
+                // Send to backend
+                if (socket) {
+                  socket.emit('user-message', { sessionId, message: currentTranscript });
+                }
+                
+                // Clear the interim transcript display
+                setUserTranscript('');
+              }
+            }, 1500); // Reduced to 1.5 seconds for faster response
           }
         }
       });
@@ -173,7 +221,18 @@ export const SessionProvider = ({ children }) => {
 
       newDgConnection.on(LiveTranscriptionEvents.Error, (error) => {
         console.error('Deepgram error:', error);
-        // Consider attempting to stop transcription here as well
+        
+        // Attempt to restart transcription after a brief delay
+        console.log('Will attempt to restart transcription in 3 seconds...');
+        setTimeout(() => {
+          if (isTranscribing) {
+            console.log('Attempting to restart transcription after error');
+            stopTranscription();
+            setTimeout(() => {
+              startTranscription();
+            }, 1000);
+          }
+        }, 3000);
       });
       
       setDgConnection(newDgConnection);
