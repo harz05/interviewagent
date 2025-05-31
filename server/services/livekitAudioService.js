@@ -13,7 +13,7 @@ const path = require('path');
 const { pipeline } = require('stream/promises');
 const { addMessageToSession } = require('./sessionStore');
 // Import the getIoInstance function directly
-const { getIoInstance } = require('../server');
+const { getIoInstance } = require('../utils/socketInstance');
 const { spawn } = require('child_process'); // For FFMPEG
 
 // Export the handleTranscript function so it can be used by socketService.js
@@ -257,14 +257,13 @@ async function handleTranscript(roomName, userIdentity, transcript, isInitialAIM
         timestamp: new Date()
       });
 
-      // Use the imported getIoInstance function directly
-      const io = getIoInstance;
+      const io = getIoInstance();
       if (io) {
         io.to(roomName).emit('ai-message', aiTextResponse);
-        logger.info(`[LiveKitAudioService] Emitted 'ai-message' via Socket.IO to room ${roomName}`);
       } else {
         logger.warn(`[LiveKitAudioService] Socket.IO instance not available, cannot emit 'ai-message' for room ${roomName}`);
       }
+
 
       const ttsService = getTTSServiceProvider();
       if (!ttsService || !ttsService.textToSpeech) {

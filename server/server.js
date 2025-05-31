@@ -3,13 +3,13 @@ const app = require('./app');
 const socketIo = require('socket.io');
 const config = require('./config');
 const { setupSocketHandlers } = require('./services/socketService');
+const { setIoInstance } = require('./utils/socketInstance');
 const logger = require('./utils/logger');
 console.log(process.env.LIVEKIT_API_KEY)
 // Create HTTP server
 const server = http.createServer(app);
 
 // Setup Socket.IO with CORS
-let ioInstance = null; // To store the io instance
 
 const io = socketIo(server, {
   cors: {
@@ -17,20 +17,12 @@ const io = socketIo(server, {
     methods: ['GET', 'POST']
   }
 });
-ioInstance = io; // Assign to the module-level variable
+setIoInstance(io); // Save the io instance globally
 
 // Initialize socket handlers
 setupSocketHandlers(io);
 
-// Export a getter for the io instance
-const getIoInstance = () => {
-    if (!ioInstance) {
-        logger.warn('Socket.IO instance requested before initialization!');
-    }
-    return ioInstance;
-};
-
-module.exports = { server, getIoInstance }; // Export server and getter
+module.exports = { server }; // Only export the server now
 
 // Start server
 server.listen(config.port, () => {
